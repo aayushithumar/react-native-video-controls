@@ -49,10 +49,12 @@ export default class VideoPlayer extends Component {
       muted: this.props.muted,
       volume: this.props.volume,
       rate: this.props.rate,
+      //thumbnail uri
+      thumbnailUri: this.props.thumbnailUri,
       // Controls
 
       isFullscreen:
-        this.props.isFullScreen || this.props.resizeMode === 'cover' || false,
+      this.props.isFullscreen || this.props.resizeMode === 'cover' || false,
       showTimeRemaining: this.props.showTimeRemaining,
       showHours: this.props.showHours,
       volumeTrackWidth: 0,
@@ -67,7 +69,7 @@ export default class VideoPlayer extends Component {
       originallyPaused: false,
       scrubbing: false,
       loading: false,
-      currentTime: 0,
+      currentTime: this.props.currentTime,
       error: false,
       duration: 0,
     };
@@ -158,10 +160,11 @@ export default class VideoPlayer extends Component {
     this.styles = {
       videoStyle: this.props.videoStyle || {},
       containerStyle: this.props.style || {},
+      thumbnailStyle: this.props.thumbnailStyle || {},
     };
   }
 
-  componentDidUpdate = prevProps => {
+  componentDidUpdate = (prevProps) => {
     const {isFullscreen} = this.props;
 
     if (prevProps.isFullscreen !== isFullscreen) {
@@ -184,13 +187,17 @@ export default class VideoPlayer extends Component {
   /**
    * When load starts we display a loading icon
    * and show the controls.
-   */
+   * If the user wants to display a thumbnail instead, 
+   * the animation does not start.
+   ***/
   _onLoadStart() {
     let state = this.state;
     state.loading = true;
     this.loadAnimation();
     this.setState(state);
-
+    if (!this.state.thumbnailUri){
+      this.loadAnimation();
+    }
     if (typeof this.props.onLoadStart === 'function') {
       this.props.onLoadStart(...arguments);
     }
@@ -285,6 +292,9 @@ export default class VideoPlayer extends Component {
     state.loading = false;
 
     this.setState(state);
+    if (typeof this.props.catchError === "function") {
+      this.props.catchError(err);
+    }
   }
 
   /**
@@ -753,6 +763,9 @@ export default class VideoPlayer extends Component {
     if (this.styles.containerStyle !== nextProps.style) {
       this.styles.containerStyle = nextProps.style;
     }
+    if (this.styles.thumbnailStyle !== nextProps.style) {
+      this.styles.thumbnailStyle = nextProps.style;
+    }
   }
 
   /**
@@ -1087,7 +1100,7 @@ export default class VideoPlayer extends Component {
         {...this.player.seekPanResponder.panHandlers}>
         <View
           style={styles.seekbar.track}
-          onLayout={event =>
+          onLayout={(event) =>
             (this.player.seekerWidth = event.nativeEvent.layout.width)
           }
           pointerEvents={'none'}>
@@ -1163,10 +1176,20 @@ export default class VideoPlayer extends Component {
   }
 
   /**
-   * Show loading icon
+   * Show loading icon or thumbnail
    */
   renderLoader() {
     if (this.state.loading) {
+      if (this.state.thumbnailUri) {
+        return (
+          <View style={styles.loader.container}>
+          <Image
+              source={{uri: this.state.thumbnailUri}}
+              style={[this.styles.thumbnailStyle]}
+          />
+          </View>
+        )
+      }
       return (
         <View style={styles.loader.container}>
           <Animated.Image
@@ -1199,7 +1222,7 @@ export default class VideoPlayer extends Component {
             source={require('./assets/img/error-icon.png')}
             style={styles.error.icon}
           />
-          <Text style={styles.error.text}>Video unavailable</Text>
+          <Text style={styles.error.text}>{this.props.errorMessage || 'Video unavailable'}</Text>
         </View>
       );
     }
@@ -1217,7 +1240,7 @@ export default class VideoPlayer extends Component {
         <View style={[styles.player.container, this.styles.containerStyle]}>
           <Video
             {...this.props}
-            ref={videoPlayer => (this.player.ref = videoPlayer)}
+            ref={(videoPlayer) => (this.player.ref = videoPlayer)}
             resizeMode={this.state.resizeMode}
             volume={this.state.volume}
             paused={this.state.paused}
